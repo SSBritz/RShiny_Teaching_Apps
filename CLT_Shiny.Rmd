@@ -1,0 +1,133 @@
+---
+title: "Central Limit Theorem Illustration"
+author: "Stefan Britz"
+date: "University of Cape Town"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+```
+
+
+## This app demonstrates the Central Limit Theorem interactively
+
+#### First select the distribution of $X$ 
+
+```{r}
+inputPanel(
+  radioButtons("dist", label = 'Select a type of distribution', 
+               choices = c("N(0, 1)" = "stand_norm", "N(10, 25)" = "gaus", "Gamma(2, 5)"= "gam", 
+                           "U(1, 6)" = "uni", "Beta(0.5, 0.5)" = "bet", "Poisson(5)" = "pois", 
+                           "Binomial(8, 0.1)" = "bin"))
+)
+```
+
+
+
+
+#### Here is the pdf/pmf of the selected variable:
+```{r}
+
+dist_plot <- function(type){
+  switch(type,
+         stand_norm = curve(dnorm(x), -4, 4, lwd = 2, xlab = 'X ~ N(0, 1)', ylab = "", cex.lab = 2),
+         gaus = curve(dnorm(x, 10, 5), -10, 30, lwd = 2, xlab = 'X ~ N(10, 25)', ylab = "", cex.lab = 2),
+         gam = curve(dgamma(x, 2, 5), 0, 4, lwd = 2, xlab = 'X ~ Gamma(2, 5)', ylab = "", cex.lab = 2),
+         bet = curve(dbeta(x, 0.5, 0.5), 0, 1, lwd = 2, xlab = 'X ~ Beta(0.5, 0.5)', ylab = "", cex.lab = 2),
+         uni = curve(dunif(x, 1, 6), 0, 7, lwd = 2, xlab = 'X ~ U(1, 6)', ylab = "", cex.lab = 2),
+         pois = barplot(dpois(0:20, 5), names.arg = 0:20, cex.lab = 2, xlab = 'X ~ Pois(5)', ylab = ""),
+         bin = barplot(dbinom(0:8, 8, 0.1), names.arg = 0:8, cex.lab = 2, xlab = 'X ~ Bin(8, 0.1)', ylab = "")
+  )
+  
+}
+renderPlot({dist_plot(input$dist)})
+
+```
+
+#### We will now sample from this distribution and display the distribution of the sample mean: $\bar{X} = \frac{\sum_{i=1}^{n} X_i}{n}$. Select the sample size (n).
+
+
+```{r}
+inputPanel(
+  numericInput("sample_size", "Choose a sample size", 100, 1, 1000) 
+)
+```
+
+### Below is the distribution of the means from 10 000 of these samples
+
+``` {r}
+
+
+means_dist <- function(type){
+  
+  
+  randvals <<- switch(type,
+                      stand_norm = apply(matrix(rnorm(10000*input$sample_size), nrow = input$sample_size), 2, mean),
+                      gaus = apply(matrix(rnorm(10000*input$sample_size, 10, 5), nrow = input$sample_size), 2, mean),
+                      gam = apply(matrix(rgamma(10000*input$sample_size, 2, 5), nrow = input$sample_size), 2, mean),
+                      bet = apply(matrix(rbeta(10000*input$sample_size, 0.5, 0.5), nrow = input$sample_size), 2, mean),
+                      uni = apply(matrix(runif(10000*input$sample_size, 1, 6), nrow = input$sample_size), 2, mean),
+                      pois = apply(matrix(rpois(10000*input$sample_size, 5), nrow = input$sample_size), 2, mean),
+                      bin = apply(matrix(rbinom(10000*input$sample_size, 8, 0.1), nrow = input$sample_size), 2, mean)
+  )
+  
+  hist(randvals, main =  expression(paste("Histogram of ", bar(X))), xlab = expression(bar(X)), 
+       col = 'darkgray', border = 'white', freq = FALSE)
+}
+
+dens_dist <- function(type){
+  switch(type,
+         stand_norm = curve(dnorm(x, 0, sqrt(1/input$sample_size)), add = TRUE, col = "blue"),
+         gaus = curve(dnorm(x, 10, sqrt(25/input$sample_size)), add = TRUE, col = "blue"),
+         gam = curve(dnorm(x, 2/5, sqrt((2/25)/input$sample_size)), add = TRUE, col = "blue"),
+         bet = curve(dnorm(x, 0.5, sqrt((1/8)/input$sample_size)), add = TRUE, col = "blue"),
+         uni = curve(dnorm(x, 3.5, sqrt((25/12)/input$sample_size)), add = TRUE, col = "blue"),
+         pois = curve(dnorm(x, 5, sqrt(5/input$sample_size)), add = TRUE, col = "blue"),
+         bin = curve(dnorm(x, 0.8, sqrt(0.72/input$sample_size)), add = TRUE, col = "blue")
+  )
+}
+
+
+renderPlot({
+  means_dist(input$dist)
+  
+  if(input$show_norm == TRUE) dens_dist(input$dist)
+  
+})
+```
+
+#### Tick the following box to display the density function of $\bar{X} \sim N\left(\mu, \frac{\sigma^2}{n}\right)$
+
+```{r}
+inputPanel(
+  checkboxInput("show_norm", "Fit Normal Density?", FALSE)
+)
+```
+
+#### Using the emperical moments to check the distributional characteristics of $\bar{X}$:
+
+```{r}
+library(moments)
+
+inputPanel(
+  actionButton(inputId = "calc_moments", label = "Re-calculate for the above sample")
+)
+
+moments <- function(){
+  plot.new()
+  text(0.2, 0.8, paste("Mean = ", round(mean(randvals), 2)), cex = 3)
+  text(0.2, 0.2, paste("Variance = ", round(var(randvals), 5)), cex = 3)
+  text(0.75, 0.8, paste("Coef of Skewness = ", round(skewness(randvals), 2)), cex = 3)
+  text(0.78, 0.2, paste("Excess Kurtosis = ", round(kurtosis(randvals) - 3, 2)), cex = 3)
+}
+
+p <- eventReactive(input$calc_moments, {moments()})
+
+renderPlot({
+  p()
+})
+
+```
+

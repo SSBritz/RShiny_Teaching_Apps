@@ -1,0 +1,13 @@
+name: central_limit_theorem_illustration
+title: central_limit_theorem_illustration
+username:
+account: stefanbritz
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 412359
+bundleId: 5681377
+url: https://stefanbritz.shinyapps.io/central_limit_theorem_illustration/
+when: 1647260871.71509
+lastSyncTime: 1647260871.71509
+asMultiple: FALSE
+asStatic: FALSE

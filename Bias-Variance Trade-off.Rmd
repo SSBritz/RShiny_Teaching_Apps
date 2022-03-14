@@ -1,0 +1,261 @@
+---
+title: "Bias-Variance Trade-off"
+author: "Stefan Britz"
+date: "University of Cape Town"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+***
+
+
+### This interactive demonstration illustrates the compromise between accuracy (low __bias__) and generalisability (low __variance__) when choosing model complexity in statistical models. 
+
+
+When fitting a model to data, we are essentially trying to infer what underlying process created the data.  
+
+We will now simulate various datasets from some predetermined n^th^-degree polynomial - with random parameters and random errors. Hence we know the *complexity* of the underlying process.  
+
+Then we will fit polynomials of varying degrees to the data to investigate two things:
+
+* How well does the model fit the data? This is the __BIAS__.
+* How much does the model change from one sample to the next? This is the __VARIANCE__.
+
+Lastly, we will investigate how well the models fitted to one dataset of a certain complexity perform when used to predict values from a new dataset generated from the same process.
+
+### Select the polynomial degree
+```{r}
+
+max_com <<- 6
+
+inputPanel(
+    sliderInput(inputId = "poly_deg", label = "Polynomial degree:", min = 1, max = max_com, value = 3, step = 1)
+)
+```
+
+
+### Firstly, let's see what a sample of random values from this process with some random parameters looks like
+```{r}
+inputPanel(
+    sliderInput(inputId = "sample_size", label = "Choose a sample size:", min = 1, max = 100, value = 10, step = 1)
+)
+
+inputPanel(
+  actionButton(inputId = "plot_sample", label = "Randomize polynomial parameters and draw Sample")
+)
+
+sample_plot <- function(deg){
+  
+params <<- rnorm(max_com + 1, sd = 2)[1:(deg+1)] #COOOOOOL!!! How to save variables globally within function!
+
+sig <<- 2 #set the residual variance
+
+llimit <<- -2
+ulimit <<- 2
+
+x <- runif(input$sample_size, llimit, ulimit)
+xmat <- matrix(1, nrow = input$sample_size, ncol = deg+1)
+for (i in 1:deg) xmat[,i+1] <- t(x)^i
+y <- xmat%*%params + rnorm(input$sample_size, sd = sig)
+
+plot(x,y,type="p", xlim=c(llimit,ulimit), cex=1.7, pch=19, 
+     main = paste("Sample from polynomial with degree: ", deg))
+}
+
+p <- eventReactive(input$plot_sample, {sample_plot(input$poly_deg)})
+
+renderPlot({
+  p()
+})
+
+```
+
+### Let's now fit 3 different models with different complexities to random samples of size 10 from a process with the above parameters: a) A straight line (1st degree polynomial), b) The "correct" model, and c) A relatively complex 6th degree polynomial:
+
+```{r}
+inputPanel(
+  actionButton(inputId = "fits", label = "Sample & Fit")
+)
+
+fit_plots <- function(deg){
+  
+sample_size <<- 10
+  
+x <- runif(sample_size, llimit, ulimit)
+xmat <- matrix(1, nrow = sample_size, ncol = deg+1)
+for (i in 1:deg) xmat[,i+1] <- t(x)^i
+y <- xmat%*%params + rnorm(sample_size, sd = sig)
+
+par(mfrow = c(1, 3))
+plot(x,y,type="p", xlim=c(llimit,ulimit), cex=1.7, pch=19, 
+     main = "Polynomial fit: 1st degree",
+     sub = paste("Actual complexity = ", deg), cex.main = 2, cex.sub = 2)
+mod1 <<- lm(y~x)
+abline(mod1, col="blue", lwd=3)
+mse <- round(mean((mod1$residuals)^2), 0)
+text(llimit,min(y),paste("MSE = ", mse), cex=3, pos = 4)
+
+plot(x,y,type="p", xlim=c(llimit,ulimit), cex=1.7, pch=19, 
+     main = paste("Polynomial fit degree: ", deg), cex.main = 2)
+mod2 <<- lm(y~poly(x, deg))
+xx <- seq(llimit,ulimit,0.001)
+lines(xx, predict(mod2, data.frame(x=xx)), col="green", lwd = 3)
+mse <- round(mean((mod2$residuals)^2), 0)
+text(llimit,min(y),paste("MSE = ", mse), cex=3, pos = 4)
+
+plot(x,y,type="p", xlim=c(llimit,ulimit), cex=1.7, pch=19, 
+     main = "Polynomial fit: 6th degree",
+     sub = paste("Actual complexity = ", deg), cex.main = 2, cex.sub = 2)
+mod3 <<- lm(y~poly(x, 6, raw = T))
+lines(xx, predict(mod3, data.frame(x=xx)), col="red", lwd = 3)
+mse <- round(mean((mod3$residuals)^2), 0)
+text(llimit,min(y),paste("MSE = ", mse), cex=3, pos = 4)
+
+}
+
+p2 <- eventReactive(input$fits, {fit_plots(input$poly_deg)})
+
+renderPlot({
+  p2()
+})
+```
+
+
+### The most complex model looks great! __But__... what happens when we use these curves to predict new values, based on a new sample from the above population?
+
+```{r}
+inputPanel(
+  actionButton(inputId = "fits2", label = "Fit models to unseen data")
+)
+
+fit_plots2 <- function(deg){
+  
+x <- runif(sample_size, llimit, ulimit)
+xmat <- matrix(1, nrow = sample_size, ncol = deg+1)
+for (i in 1:deg) xmat[,i+1] <- t(x)^i
+y <- xmat%*%params + rnorm(sample_size, sd = sig)
+
+dfram <- data.frame('x'=x)
+dfram$y <- y
+
+par(mfrow = c(1, 3))
+plot(x,y,type="p", xlim=c(llimit,ulimit), cex=1.7, pch=19, 
+     main = "Polynomial fit: 1st degree",
+     sub = paste("Actual complexity = ", deg), cex.main = 2, cex.sub = 2)
+fit1 <- predict(mod1, dfram)
+abline(mod1, col="blue", lwd=3)
+mse <- round(mean((fit1 - y)^2), 0)
+text(llimit,min(y),paste("MSE = ", mse), cex=3, pos = 4)
+
+plot(x,y,type="p", xlim=c(llimit,ulimit), cex=1.7, pch=19, 
+     main = paste("Polynomial fit degree: ", deg), cex.main = 2)
+fit2 <- predict(mod2, dfram)
+xx <- seq(llimit,ulimit,0.001)
+lines(xx, predict(mod2, data.frame(x=xx)), col="green", lwd = 3)
+mse <- round(mean((fit2 - y)^2), 0)
+text(llimit,min(y),paste("MSE = ", mse), cex=3, pos = 4)
+
+plot(x,y,type="p", xlim=c(llimit,ulimit), cex=1.7, pch=19, 
+     main = "Polynomial fit: 6th degree",
+     sub = paste("Actual complexity = ", deg), cex.main = 2, cex.sub = 2)
+fit3 <- predict(mod3, dfram)
+lines(xx, predict(mod3, data.frame(x=xx)), col="red", lwd = 3)
+mse <- round(mean((fit3 - y)^2), 0)
+text(llimit,min(y),paste("MSE = ", mse), cex=3, pos = 4)
+
+}
+
+p3 <- eventReactive(input$fits2, {fit_plots2(input$poly_deg)})
+
+renderPlot({
+  p3()
+})
+```
+
+### In each model the expected total error, i.e. $\boldsymbol{E[RSS]}$, can be expressed as:
+
+### \[\begin{align}
+Total \, error &= Bias^2 + Variance + Irreducible \, error\\
+\rm{E}\left[\left(y - \hat{f}(x)\right)^2\right] &= \left(\rm{Bias}\left[\hat{f}(x)\right]\right)^2 + \rm{Var}\left[\hat{f}(x)\right] + \sigma^2\\
+\rm{E}\left[\left(y - \hat{f}(x)\right)^2\right] &= \left[\rm{E}\left(\hat{f}(x) - f(x)\right)\right]^2 + \left[\rm{E}\left[\hat{f}(x)^2\right] - \left(\rm{E}\left[\hat{f}(x)\right]\right)^2\right] + \sigma^2
+\end{align}
+\]
+
+#### where $\sigma^2 = \rm{Var}(\varepsilon)$
+
+### When we decompose the error for the models of different complexity, we notice a trend: (Note that the different compenents are estimated using many simulations, so this will take a short while to execute)
+
+```{r}
+inputPanel(
+  actionButton(inputId = "total_error", label = "Simulate all models")
+)
+
+error_plots <- function(deg){
+
+nsims <- 1000
+ssize <- 50
+
+x0 <-  seq(llimit, ulimit, 0.01)
+
+cmplx_list <- list()
+
+for (cmplx in 1:max_com){
+
+  predictions = matrix(0, nrow = length(x0), ncol = nsims)
+  
+  for (iter in 1:nsims){
+
+      x <- runif(ssize, llimit, ulimit)
+      xmat <- matrix(1, nrow = ssize, ncol = deg+1)
+      for (i in 1:deg) xmat[,i+1] <- t(x)^i
+      y <- xmat%*%params[1:(deg+1)] + rnorm(ssize, sd = sig)
+    
+    mod <- lm(y~poly(x, cmplx))
+  
+    predictions[,iter] <- predict(mod, newdata = data.frame(x = x0))
+    
+    cmplx_list[[cmplx]] <- predictions
+    
+  }
+}  
+
+  xmat <- matrix(1, nrow = length(x0), ncol = deg+1)
+  for (i in 1:deg) xmat[,i+1] <- t(x0)^i
+  f <- xmat%*%params[1:(deg+1)]
+  
+variances <- matrix(0, nrow = max_com, ncol = 1)
+biases <- matrix(0, nrow = max_com, ncol = 1)
+
+
+for (i in 1:max_com) {
+variances[i] <- mean(colMeans((cmplx_list[[i]] - matrix(rowMeans(cmplx_list[[i]]), nrow=length(x0), ncol=nsims, byrow=F))^2))
+biases[i] <- mean((rowMeans(cmplx_list[[i]]) - f)^2)
+}
+
+tot_error <- variances + biases^2 + sig^2
+
+best <- which(tot_error == min(tot_error))
+
+par(mfrow = c(1,1))
+
+plot(1:max_com, tot_error, type="l", xlab="Model complexity (polynomial degree)", ylab="Error", col = "black", lwd = 2, ylim = c(0, max(tot_error)))
+  lines(1:max_com, biases^2, col = "blue", lwd = 2)
+  lines(1:max_com, variances, col = "red", lwd = 2)
+  abline(v = best, lty = 2)
+  legend(x = "top", col = c("blue", "red", "black", "black"), legend = c(expression(Bias^2), "Variance", "Total Error", "Lowest error"), lty = c("solid", "solid", "solid", "dashed"), lwd = 3)
+}
+
+p4 <- eventReactive(input$total_error, {error_plots(input$poly_deg)})
+
+renderPlot({
+  p4()
+})
+```
+
+### Models that are too simple have higher bias; models that are too complex have higher variance; the ideal model finds the balance. This is the __Bias-Variance Trade-off__.
+
+

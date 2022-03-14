@@ -1,0 +1,145 @@
+---
+title: "Distribution of Sample Statistics"
+author: "Stefan Britz"
+date: "University of Cape Town"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Let's again start with sampling distribution of the mean:
+
+### $\bar{X} = \frac{\sum_{i=1}^{n} X_i}{n}$
+
+
+#### First select the distribution of $X$ 
+
+
+```{r, echo=FALSE}
+inputPanel(
+    radioButtons("dist", label = 'Select a distribution', 
+                 choices = c("N(0, 1)" = "stand_norm", "N(10, 25)" = "gaus", "Gamma(2, 5)"= "gam", "Beta(0.5, 0.5)" = "bet"))
+    
+)
+```
+
+
+#### This is the distribution of the population:
+```{r echo=FALSE, warning=FALSE}
+
+dist_plot <- function(type){
+switch(type,
+       stand_norm = curve(dnorm(x), -4, 4, ylab = 'f(x)'),
+       gaus = curve(dnorm(x, 10, 5), -10, 30, ylab = 'f(x)'),
+       gam = curve(dgamma(x, 2, 5), 0, 4, ylab = 'f(x)'),
+       bet = curve(dbeta(x, 0.5, 0.5), 0, 1, ylab = 'f(x)'))
+  
+}
+renderPlot({dist_plot(input$dist)})
+
+```
+
+#### We will now sample from this distribution. Select a sample size
+
+
+```{r, echo=FALSE}
+inputPanel(
+    numericInput("sample_size", "Choose a sample size", 100, 1, 1000) 
+
+)
+```
+
+### Below is the distribution of the means from 10 000 of these samples
+
+```{r echo=FALSE, warning=FALSE}
+means_dist <- function(type){
+switch(type,
+       stand_norm = hist(apply(matrix(rnorm(10000*input$sample_size), nrow = input$sample_size), 2, mean), 
+        main =  expression(paste("Histogram of ", bar(X))), xlab = expression(bar(X)), col = 'darkgray', border = 'white', freq = FALSE),
+       gaus = hist(apply(matrix(rnorm(10000*input$sample_size, 10, 5), nrow = input$sample_size), 2, mean), 
+        main =  expression(paste("Histogram of ", bar(X))), xlab = expression(bar(X)), col = 'darkgray', border = 'white', freq = FALSE),
+       gam = hist(apply(matrix(rgamma(10000*input$sample_size, 2, 5), nrow = input$sample_size), 2, mean), 
+        main =  expression(paste("Histogram of ", bar(X))), xlab = expression(bar(X)), col = 'darkgray', border = 'white', freq = FALSE),
+       bet = hist(apply(matrix(rbeta(10000*input$sample_size, 0.5, 0.5), nrow = input$sample_size), 2, mean), 
+        main =  expression(paste("Histogram of ", bar(X))), xlab = expression(bar(X)), col = 'darkgray', border = 'white', freq = FALSE)
+)
+}
+
+dens_dist <- function(type){
+  switch(type,
+         stand_norm = curve(dnorm(x, 0, sqrt(1/input$sample_size)), add = TRUE, col = "blue"),
+         gaus = curve(dnorm(x, 10, sqrt(25/input$sample_size)), add = TRUE, col = "blue"),
+         gam = curve(dnorm(x, 2/5, sqrt((2/25)/input$sample_size)), add = TRUE, col = "blue"),
+         bet = curve(dnorm(x, 0.5, sqrt((1/8)/input$sample_size)), add = TRUE, col = "blue")
+           )
+}
+
+
+renderPlot({
+  means_dist(input$dist)
+  
+  if(input$show_norm == TRUE) dens_dist(input$dist)
+  
+  })
+```
+
+#### Tick the following box to display the density function of $\bar{X} \sim N\left(\mu, \frac{\sigma^2}{n}\right)$
+
+```{r, echo=FALSE}
+inputPanel(
+    checkboxInput("show_norm", "Fit Normal Density?", FALSE)
+
+)
+```
+
+
+## Now we will also explore the distribution of the sample Variance: 
+
+### $S^2 = \frac{\sum_{i = 1}^{n}(X_i - \bar{X})^2}{n-1}$
+
+### Here we see the distribution of $Y = \frac{(n-1)S^2}{\sigma^2}$ from 10 000 of these samples:
+
+```{r echo=FALSE, warning=FALSE}
+vars_dist <- function(type){
+switch(type,
+       stand_norm = hist((input$sample_size - 1)/1*apply(matrix(rnorm(10000*input$sample_size), nrow = input$sample_size), 2, var), 
+        main = expression(paste("Histogram of Y = ", frac((n-1)*S^2, sigma^2))), xlab = "Y", col = 'darkgray', border = 'white', freq = FALSE),
+       gaus = hist((input$sample_size - 1)/25*apply(matrix(rnorm(10000*input$sample_size, 10, 5), nrow = input$sample_size), 2, var), 
+        main = expression(paste("Histogram of Y = ", frac((n-1)*S^2, sigma^2))), xlab = "Y", col = 'darkgray', border = 'white', freq = FALSE),
+       gam = hist((input$sample_size - 1)/(2/25)*apply(matrix(rgamma(10000*input$sample_size, 2, 5), nrow = input$sample_size), 2, var), 
+        main = expression(paste("Histogram of Y = ", frac((n-1)*S^2, sigma^2))), xlab = "Y", col = 'darkgray', border = 'white', freq = FALSE),
+       bet = hist((input$sample_size - 1)/(1/8)*apply(matrix(rbeta(10000*input$sample_size, 0.5, 0.5), nrow = input$sample_size), 2, var), 
+        main = expression(paste("Histogram of Y = ", frac((n-1)*S^2, sigma^2))), xlab = "Y", col = 'darkgray', border = 'white', freq = FALSE)
+)
+}
+
+dens_dist2 <- function(type){
+  switch(type,
+         stand_norm = curve(dchisq(x, input$sample_size - 1), add = TRUE, col = "blue"),
+         gaus = curve(dchisq(x, input$sample_size - 1), add = TRUE, col = "blue"),
+         gam = curve(dchisq(x, input$sample_size - 1), add = TRUE, col = "blue"),
+         bet = curve(dchisq(x, input$sample_size - 1), add = TRUE, col = "blue")
+           )
+}
+
+
+renderPlot({
+  vars_dist(input$dist)
+  
+  if(input$show_chi == TRUE) dens_dist2(input$dist)
+  
+  })
+```
+
+#### Tick the following box to display the density function of $\chi^2_{n-1}$
+
+```{r, echo=FALSE}
+inputPanel(
+    checkboxInput("show_chi", "Fit Density?", FALSE)
+
+)
+```
